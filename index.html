@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PassGuard | Secure Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0f172a; color: white; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        input[type="checkbox"] { accent-color: #6366f1; width: 1.2rem; height: 1.2rem; }
+        .disabled-ui { opacity: 0.4; pointer-events: none; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md glass p-8 rounded-3xl shadow-2xl">
+        <h1 class="text-2xl font-bold text-center mb-2">PassGuard</h1>
+        <p class="text-center text-gray-400 text-sm mb-8">Secure, Client-Side Password Tool</p>
+
+        <div class="relative mb-6">
+            <input type="text" id="password-display" readonly 
+                class="w-full p-4 bg-black/30 rounded-xl border border-white/10 text-xl font-mono text-indigo-400 outline-none"
+                placeholder="Click Generate">
+            <button onclick="copyToClipboard()" class="absolute right-3 top-3 text-xs bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition">Copy</button>
+        </div>
+
+        <div class="h-1.5 w-full bg-white/10 rounded-full mb-8 overflow-hidden">
+            <div id="strength-bar" class="h-full w-0 transition-all duration-500 bg-red-500"></div>
+        </div>
+
+        <div class="space-y-6">
+            <label class="flex items-center justify-between p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 cursor-pointer transition hover:bg-indigo-500/20">
+                <span class="font-bold text-indigo-300 italic">🧠 Easy to memorize</span>
+                <input type="checkbox" id="easy-mode" onchange="toggleEasyMode()">
+            </label>
+
+            <div class="flex justify-between items-center">
+                <label class="text-sm font-medium">Length: <span id="length-val" class="text-indigo-400 font-bold">12</span></label>
+                <input type="range" id="length" min="6" max="32" value="12" class="w-2/3 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <div id="options-grid" class="grid grid-cols-1 gap-4">
+                <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 cursor-pointer transition">
+                    <span>Include Capitals (A-Z)</span>
+                    <input type="checkbox" id="uppercase" checked>
+                </label>
+                <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 cursor-pointer transition">
+                    <span>Include Numbers (0-9)</span>
+                    <input type="checkbox" id="numbers" checked>
+                </label>
+                <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 cursor-pointer transition">
+                    <span>Include Symbols (!@#$)</span>
+                    <input type="checkbox" id="symbols">
+                </label>
+            </div>
+
+            <button onclick="generatePassword()" 
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold p-4 rounded-2xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
+                Generate Password
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const lengthInput = document.getElementById('length');
+        const lengthVal = document.getElementById('length-val');
+
+        lengthInput.addEventListener('input', () => { lengthVal.innerText = lengthInput.value; });
+
+        function toggleEasyMode() {
+            const isEasy = document.getElementById('easy-mode').checked;
+            document.getElementById('options-grid').className = isEasy ? 'grid grid-cols-1 gap-4 disabled-ui' : 'grid grid-cols-1 gap-4';
+        }
+
+        function generatePassword() {
+            const length = parseInt(lengthInput.value);
+            const isEasy = document.getElementById('easy-mode').checked;
+            
+            let password = "";
+            const randomValues = new Uint32Array(length);
+            window.crypto.getRandomValues(randomValues);
+
+            if (isEasy) {
+                // Easy Mode Algorithm: Alternating Consonants and Vowels (CVCV)
+                const vowels = "aeiou";
+                const consonants = "bcdfghjklmnpqrstvwxyz";
+                for (let i = 0; i < length; i++) {
+                    const pool = (i % 2 === 0) ? consonants : vowels;
+                    password += pool.charAt(randomValues[i] % pool.length);
+                    // Add a hyphen in the middle for longer passwords
+                    if (length > 8 && i === Math.floor(length / 2) - 1) password += "-";
+                }
+            } else {
+                // Standard Random Algorithm
+                const hasUpper = document.getElementById('uppercase').checked;
+                const hasNumber = document.getElementById('numbers').checked;
+                const hasSymbol = document.getElementById('symbols').checked;
+                
+                let charPool = "abcdefghijklmnopqrstuvwxyz";
+                if (hasUpper) charPool += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                if (hasNumber) charPool += "0123456789";
+                if (hasSymbol) charPool += "!@#$%^&*()";
+
+                for (let i = 0; i < length; i++) {
+                    password += charPool.charAt(randomValues[i] % charPool.length);
+                }
+            }
+
+            document.getElementById('password-display').value = password;
+            updateStrength(length, isEasy);
+        }
+
+        function updateStrength(len, isEasy) {
+            const bar = document.getElementById('strength-bar');
+            let score = (len / 32) * 100;
+            if (isEasy) score -= 20; // Easy passwords are slightly less secure than pure random ones
+            
+            bar.style.width = Math.max(score, 10) + "%";
+            bar.style.backgroundColor = score < 40 ? "#f87171" : score < 70 ? "#fbbf24" : "#34d399";
+        }
+
+        async function copyToClipboard() {
+            const pass = document.getElementById('password-display').value;
+            if (!pass || pass === "Click Generate") return;
+            await navigator.clipboard.writeText(pass);
+            alert("Copied!");
+        }
+    </script>
+</body>
+</html>
